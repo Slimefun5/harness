@@ -8,6 +8,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import org.bukkit.ChatColor;
+import org.bukkit.entity.Player;
 
 import io.github.slimefun5.harness.simulation.HarnessContext;
 import io.github.slimefun5.harness.simulation.Scenario;
@@ -16,10 +17,15 @@ import io.github.slimefun5.harness.simulation.Simulation;
 import io.github.thebusybiscuit.slimefun5.core.services.localization.Language;
 import io.github.thebusybiscuit.slimefun5.implementation.Slimefun;
 import io.github.thebusybiscuit.slimefun5.utils.compatibility.PdcCompat;
+import me.mrCookieSlime.Slimefun.api.inventory.BlockMenu;
 
 /**
  * Opens every machine menu for one viewer per language and reads the title their window shows: never blank,
- * never a raw id, never an unfilled placeholder.
+ * never a raw id, never an unfilled placeholder, and always the title core resolves for that viewer.
+ *
+ * @implNote The harness has no network channel, so a title core writes into the open-window packet is not
+ *           seen here; only {@code InventoryView#setTitle} reaches the simulated window, which exists from
+ *           1.19.4. Below that a correct server still fails this check until the harness carries real packets.
  */
 final class MenuTitleScenario implements Scenario {
 
@@ -74,12 +80,12 @@ final class MenuTitleScenario implements Scenario {
 
     private static String problemWith(MachinePlacement.PlacedMenu placed, SimulatedPlayer viewer) {
         try {
+            String intended = strip(intendedTitle(placed, viewer.player()));
             placed.menu.open(viewer.player());
             if (!viewer.hasWindowOpen()) {
                 return "does not open";
             }
-            String title = viewer.player().getOpenInventory().getTitle();
-            String shown = title == null ? "" : ChatColor.stripColor(title).trim();
+            String shown = strip(viewer.player().getOpenInventory().getTitle());
             if (shown.isEmpty()) {
                 return "shows an empty title";
             }
@@ -89,12 +95,27 @@ final class MenuTitleScenario implements Scenario {
             if (PLACEHOLDER.matcher(shown).find()) {
                 return "shows the unfilled placeholder in \"" + shown + "\"";
             }
+            if (!shown.equals(intended)) {
+                return "shows \"" + shown + "\" instead of the title core resolves for the viewer";
+            }
             return null;
         } catch (RuntimeException | LinkageError crash) {
             return "threw " + crash + " when opened";
         } finally {
             viewer.player().closeInventory();
         }
+    }
+
+    /** What core resolves this viewer's title to; the shared inventory's own title when it needs no change. */
+    private static String intendedTitle(MachinePlacement.PlacedMenu placed, Player viewer) {
+        String perViewer = placed.menu instanceof BlockMenu
+            ? Slimefun.getMenuTranslationService().getTitleFor((BlockMenu) placed.menu, viewer)
+            : null;
+        return perViewer != null ? perViewer : ChatColor.translateAlternateColorCodes('&', placed.preset.getTitle());
+    }
+
+    private static String strip(String title) {
+        return title == null ? "" : ChatColor.stripColor(title).trim();
     }
 
     private static String describe(List<String> languages, int total) {
