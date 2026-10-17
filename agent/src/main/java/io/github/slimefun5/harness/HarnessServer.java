@@ -3,7 +3,10 @@ package io.github.slimefun5.harness;
 import java.lang.reflect.Constructor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
@@ -51,7 +54,7 @@ final class HarnessServer {
         Reflect.set(server, "pluginManager", pluginManager);
         attachPaperPluginManager(server, commandMap, pluginManager);
         Bukkit.setServer(server);
-        registerConstructorStatics(layout);
+        registerConstructorStatics(layout, server);
         return new HarnessServer(server, scheduler);
     }
 
@@ -60,8 +63,9 @@ final class HarnessServer {
      * the NMS enchantment and effect classes registers their Bukkit wrappers, then registration is closed,
      * exactly as on a live server.
      */
-    private static void registerConstructorStatics(ServerLayout layout) throws ReflectiveOperationException {
+    private static void registerConstructorStatics(ServerLayout layout, Server server) throws ReflectiveOperationException {
         if (layout.era != ServerLayout.Era.VERSIONED) {
+            installCommodoreReroutes(layout, server);
             return;
         }
         ClassLoader loader = HarnessServer.class.getClassLoader();
@@ -105,6 +109,32 @@ final class HarnessServer {
             minecraftServer = minecraftServer.getSuperclass();
         }
         Reflect.setStaticOfType(minecraftServer, minecraftServer, console);
+    }
+
+    /**
+     * Arms the bytecode rewriter that upgrades older plugins' API calls (1.20.5+), as the constructor does from
+     * {@code bukkit.yml}'s compatibility list, which is empty by default.
+     */
+    private static void installCommodoreReroutes(ServerLayout layout, Server server) throws ReflectiveOperationException {
+        Class<?> magicNumbers = Reflect.firstClass(layout.craft("util.CraftMagicNumbers"));
+        java.lang.reflect.Method getCommodore = magicNumbers == null ? null : findMethod(magicNumbers, "getCommodore");
+        if (getCommodore == null) {
+            return;
+        }
+        Set<String> activeCompatibilities = new HashSet<>();
+        Reflect.set(server, "activeCompatibilities", activeCompatibilities);
+        Object commodore = getCommodore.invoke(magicNumbers.getField("INSTANCE").get(null));
+        Predicate<String> isActive = activeCompatibilities::contains;
+        commodore.getClass().getMethod("updateReroute", Predicate.class).invoke(commodore, isActive);
+    }
+
+    private static java.lang.reflect.Method findMethod(Class<?> type, String name) {
+        for (java.lang.reflect.Method method : type.getMethods()) {
+            if (method.getName().equals(name) && method.getParameterCount() == 0) {
+                return method;
+            }
+        }
+        return null;
     }
 
     /**
