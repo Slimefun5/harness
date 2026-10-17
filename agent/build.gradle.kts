@@ -30,6 +30,8 @@ tasks {
         options.encoding = "UTF-8"
     }
     jar {
+        // The probe compiles against this one; the harness runs the shadow jar, which must not share its file.
+        archiveClassifier.set("plain")
         manifest {
             attributes(
                 "Premain-Class" to "io.github.slimefun5.harness.HarnessAgent",

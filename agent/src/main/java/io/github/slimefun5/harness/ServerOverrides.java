@@ -1,13 +1,15 @@
 package io.github.slimefun5.harness;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import net.bytebuddy.implementation.bind.annotation.RuntimeType;
 
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
+
+import io.github.slimefun5.harness.simulation.Simulation;
 
 /** Replacement bodies for {@code CraftServer} methods that read state only a running game has. */
 public final class ServerOverrides {
@@ -35,7 +37,25 @@ public final class ServerOverrides {
         private OnlinePlayers() {}
 
         public static List<?> getOnlinePlayers() {
-            return Collections.emptyList();
+            return Simulation.onlinePlayers();
+        }
+    }
+
+    /** A live server looks players up in its player list, which only real connections fill. */
+    public static final class PlayerLookup {
+
+        private PlayerLookup() {}
+
+        public static Player getPlayer(UUID uniqueId) {
+            return Simulation.onlinePlayer(uniqueId);
+        }
+
+        public static Player getPlayer(String name) {
+            return Simulation.onlinePlayer(name);
+        }
+
+        public static Player getPlayerExact(String name) {
+            return Simulation.onlinePlayer(name);
         }
     }
 
@@ -83,7 +103,7 @@ public final class ServerOverrides {
         private OnlinePlayerArray() {}
 
         public static Player[] getOnlinePlayers() {
-            return new Player[0];
+            return Simulation.onlinePlayers().toArray(new Player[0]);
         }
     }
 }

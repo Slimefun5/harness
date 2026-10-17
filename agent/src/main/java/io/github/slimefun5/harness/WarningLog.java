@@ -17,6 +17,8 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Pattern;
 
+import io.github.slimefun5.harness.simulation.HarnessContext;
+
 /** Collects every log record at WARNING or above from the server and every plugin. */
 final class WarningLog extends Handler {
 
@@ -87,6 +89,9 @@ final class WarningLog extends Handler {
             return;
         }
         String message = record.getLevel() + " [" + record.getLoggerName() + "] " + FORMATTER.formatMessage(record);
+        if (!"Harness".equals(record.getLoggerName())) {
+            message += HarnessContext.suffix();
+        }
         if (record.getThrown() != null) {
             message += System.lineSeparator() + stackTrace(record.getThrown());
         }

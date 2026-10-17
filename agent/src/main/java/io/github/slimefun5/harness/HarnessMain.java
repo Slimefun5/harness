@@ -11,9 +11,17 @@ import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
 
+import org.bukkit.Server;
+import org.bukkit.plugin.RegisteredServiceProvider;
+
+import io.github.slimefun5.harness.simulation.HarnessContext;
+import io.github.slimefun5.harness.simulation.Scenario;
+import io.github.slimefun5.harness.simulation.Simulation;
+
 /**
  * Runs inside one version's JVM: bootstraps that version's game data, installs the harness server, loads and
- * enables the plugins, runs the start-up ticks, and writes a report next to the given path.
+ * enables the plugins, runs the start-up ticks and then every registered {@link Scenario}, and writes a report
+ * next to the given path.
  */
 public final class HarnessMain {
 
@@ -35,7 +43,9 @@ public final class HarnessMain {
             HarnessServer harness = HarnessServer.install(layout, arguments.version, Logger.getLogger("Minecraft"));
             GameBootstrap.loadVanillaData(layout, harness.console);
             PluginBoot.loadAndEnable(harness.server.getPluginManager(), arguments.plugins, new File("plugins"), log);
-            new VirtualClock(harness.scheduler).advance(STARTUP_TICKS, log);
+            VirtualClock clock = new VirtualClock(harness.scheduler);
+            clock.advance(STARTUP_TICKS, log);
+            runScenarios(harness.server, new Simulation(ticks -> clock.advance(ticks, log)), log);
         } catch (Throwable fatal) {
             Throwable cause = rootCause(fatal);
             log.harnessFailure("the harness stopped", cause);
@@ -45,6 +55,21 @@ public final class HarnessMain {
         writeReport(arguments.report, log.records(), Allowlist.read(arguments.allowlist), failure,
             (System.nanoTime() - start) / 1_000_000);
         System.exit(0);
+    }
+
+    /** Runs every scenario a plugin registered, each on its own, so one that crashes does not hide the rest. */
+    private static void runScenarios(Server server, Simulation simulation, WarningLog log) {
+        for (RegisteredServiceProvider<Scenario> registration : server.getServicesManager().getRegistrations(Scenario.class)) {
+            Scenario scenario = registration.getProvider();
+            HarnessContext.set("scenario " + scenario.name());
+            try {
+                scenario.run(simulation);
+            } catch (Throwable failure) {
+                log.harnessFailure("scenario " + scenario.name() + " stopped", rootCause(failure));
+            } finally {
+                HarnessContext.clear();
+            }
+        }
     }
 
     /** Reflection wraps every failure it relays; the report wants what actually went wrong. */

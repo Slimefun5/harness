@@ -11,8 +11,8 @@ import me.mrCookieSlime.Slimefun.api.inventory.BlockMenuPreset;
  * Every registered machine menu has a title and, when it fixes its own size, one a chest inventory can have.
  *
  * @implNote The stored title is not what a player reads: under the id-only rule it is the machine's baked
- *           name, and core translates it per viewer when the menu opens. Checking the shown title needs a
- *           viewer, so it belongs with the simulated-player checks.
+ *           name, and core translates it per viewer when the menu opens; {@link MenuTitleScenario} checks
+ *           the title each viewer is shown.
  */
 final class MenuPresetCheck implements RegistryCheck {
 

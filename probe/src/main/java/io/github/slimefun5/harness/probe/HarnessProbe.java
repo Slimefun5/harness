@@ -6,13 +6,17 @@ import java.util.logging.Level;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import io.github.slimefun5.harness.simulation.Scenario;
 
 import io.github.thebusybiscuit.slimefun5.api.events.SlimefunItemRegistryFinalizedEvent;
 
 /**
- * Runs every registry check once Slimefun has finished registering core's and every addon's content. Each
- * failure is logged at SEVERE, which the harness gate fails on unless it is allowlisted.
+ * Runs every registry check once Slimefun has finished registering core's and every addon's content, and
+ * offers the harness the scenarios that need simulated players and blocks. Each failure is logged at SEVERE,
+ * which the harness gate fails on unless it is allowlisted.
  */
 public final class HarnessProbe extends JavaPlugin implements Listener {
 
@@ -26,6 +30,8 @@ public final class HarnessProbe extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getServicesManager().register(Scenario.class, new MenuTitleScenario(getLogger()), this, ServicePriority.Normal);
+        getServer().getServicesManager().register(Scenario.class, new MenuClickScenario(getLogger()), this, ServicePriority.Normal);
     }
 
     @EventHandler

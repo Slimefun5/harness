@@ -9,3 +9,8 @@ description = "Runs the harness's registry checks inside the server, after Slime
 
 // The Slimefun-addon conventions: Java 8, the spigot-api baseline, core's API, and a jar that never bundles core.
 apply(from = "https://raw.githubusercontent.com/Slimefun5/gradle/main/slimefun-addon.gradle")
+
+dependencies {
+    // The simulation the harness runs the scenarios in; on the class path of every harness run, never bundled.
+    compileOnly(project(":agent"))
+}

@@ -9,6 +9,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 import java.lang.instrument.Instrumentation;
 import java.util.Collection;
+import java.util.UUID;
 
 import net.bytebuddy.agent.builder.AgentBuilder;
 import net.bytebuddy.implementation.MethodDelegation;
@@ -34,6 +35,8 @@ public final class HarnessAgent {
                 .intercept(MethodDelegation.to(ServerOverrides.OnlinePlayers.class))
                 .method(named("getOnlinePlayers").and(takesArguments(0)).and(returns(isArray())))
                 .intercept(MethodDelegation.to(ServerOverrides.OnlinePlayerArray.class))
+                .method(named("getPlayer").or(named("getPlayerExact")).and(takesArguments(String.class).or(takesArguments(UUID.class))))
+                .intercept(MethodDelegation.to(ServerOverrides.PlayerLookup.class))
                 .method(named("getConsoleSender").and(takesArguments(0)))
                 .intercept(MethodDelegation.to(ServerOverrides.ConsoleSender.class))
                 .method(named("getPluginsFolder").and(takesArguments(0)))
