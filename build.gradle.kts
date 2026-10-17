@@ -85,6 +85,7 @@ val versionTasks = versions.map { version ->
             classpath = files(agent) + loader + files(serverClasspath(version))
             jvmArgs("-javaagent:${agent.absolutePath}", "-Xmx2g")
             args("--version", version, "--report", reportFile(version).absolutePath,
+                "--allowlist", file("allowlist.txt").absolutePath,
                 "--plugins", pluginJars.joinToString(File.pathSeparator) { it.absolutePath })
         }
     }

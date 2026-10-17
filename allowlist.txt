@@ -1,0 +1,5 @@
+# Warnings the harness accepts. One regular expression per line, matched against the first line of a
+# record as it appears in build/harness/<version>/warnings.txt; a match moves the record to accepted.txt.
+#
+# Empty on purpose: every warning fails the run until it is fixed at its source or accepted here by the
+# owner. Give each entry a comment saying why it is accepted.

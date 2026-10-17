@@ -42,7 +42,8 @@ public final class HarnessMain {
             failure = cause.toString();
         }
         log.importLog4jFile(new File("logs/latest.log"));
-        writeReport(arguments.report, log.records(), failure, (System.nanoTime() - start) / 1_000_000);
+        writeReport(arguments.report, log.records(), Allowlist.read(arguments.allowlist), failure,
+            (System.nanoTime() - start) / 1_000_000);
         System.exit(0);
     }
 
@@ -55,23 +56,34 @@ public final class HarnessMain {
         return cause;
     }
 
-    private static void writeReport(File report, List<String> warnings, String failure, long millis) throws IOException {
-        report.getParentFile().mkdirs();
-        File warningsFile = new File(report.getParentFile(), "warnings.txt");
-        Files.write(warningsFile.toPath(), String.join(System.lineSeparator() + System.lineSeparator(), warnings)
-            .getBytes(StandardCharsets.UTF_8));
+    /** Writes the failing records to {@code warnings.txt}, the accepted ones to {@code accepted.txt}, and the verdict. */
+    private static void writeReport(File report, List<String> records, Allowlist allowlist, String failure, long millis)
+            throws IOException {
+        List<String> failing = new ArrayList<>();
+        List<String> accepted = new ArrayList<>();
+        for (String record : records) {
+            (allowlist.accepts(record) ? accepted : failing).add(record);
+        }
+        writeRecords(new File(report.getParentFile(), "warnings.txt"), failing);
+        writeRecords(new File(report.getParentFile(), "accepted.txt"), accepted);
         Properties properties = new Properties();
-        properties.setProperty("status", failure == null && warnings.isEmpty() ? "PASS" : "FAIL");
+        properties.setProperty("status", failure == null && failing.isEmpty() ? "PASS" : "FAIL");
         properties.setProperty("summary", (failure != null ? "stopped: " + failure + ", " : "")
-            + warnings.size() + " warning(s), " + millis + " ms");
+            + failing.size() + " warning(s), " + accepted.size() + " accepted, " + millis + " ms");
         try (OutputStream out = new FileOutputStream(report)) {
             properties.store(out, null);
         }
     }
 
+    private static void writeRecords(File file, List<String> records) throws IOException {
+        String separator = System.lineSeparator() + System.lineSeparator();
+        Files.write(file.toPath(), String.join(separator, records).getBytes(StandardCharsets.UTF_8));
+    }
+
     private static final class Arguments {
         String version;
         File report;
+        File allowlist;
         final List<File> plugins = new ArrayList<>();
 
         static Arguments parse(String[] args) {
@@ -83,6 +95,9 @@ public final class HarnessMain {
                         break;
                     case "--report":
                         parsed.report = new File(args[i + 1]);
+                        break;
+                    case "--allowlist":
+                        parsed.allowlist = new File(args[i + 1]);
                         break;
                     case "--plugins":
                         for (String path : args[i + 1].split(File.pathSeparator)) {
