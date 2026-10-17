@@ -1,0 +1,24 @@
+name: Auto Merge
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  merge:
+    permissions:
+      contents: write
+    uses: intisy/workflows/.github/workflows/merge.yml@main
+    with:
+      source: development
+      target: main
+      mode: overwrite
+
+  readme:
+    needs: merge
+    permissions:
+      contents: write
+    uses: intisy/workflows/.github/workflows/readme.yml@main
+    with:
+      repository: ${{ github.repository }}
