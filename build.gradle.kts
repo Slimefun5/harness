@@ -33,13 +33,45 @@ fun serverClasspath(version: String): List<File> {
     return listOf(serverJar) + libraries
 }
 
+fun versionParts(version: String) = version.split('.').map { it.toInt() }
+
+fun compareVersions(left: String, right: String): Int {
+    val a = versionParts(left)
+    val b = versionParts(right)
+    for (i in 0 until maxOf(a.size, b.size)) {
+        val difference = a.getOrElse(i) { 0 } - b.getOrElse(i) { 0 }
+        if (difference != 0) {
+            return difference
+        }
+    }
+    return 0
+}
+
+/** The newest `loaders/<first version>` folder that is not newer than this version, if any. */
+fun loaderFor(version: String): File? = file("loaders").listFiles { candidate -> candidate.isDirectory }
+    ?.filter { compareVersions(it.name, version) <= 0 }
+    ?.maxWithOrNull { a, b -> compareVersions(a.name, b.name) }
+
 fun reportFile(version: String) = layout.buildDirectory.file("harness/$version/report.properties").get().asFile
 
 val versionTasks = versions.map { version ->
+    val loaderSource = loaderFor(version)
+    val loaderClasses = layout.buildDirectory.dir("harness-loaders/$version")
+    val compileLoader = loaderSource?.let { source ->
+        tasks.register<JavaCompile>("compileLoader_$version") {
+            description = "Compiles the vanilla datapack loader against the real $version server."
+            this.source = fileTree(source)
+            classpath = files(serverClasspath(version))
+            destinationDirectory.set(loaderClasses)
+            javaCompiler.set(javaToolchains.compilerFor { languageVersion.set(JavaLanguageVersion.of(jdkFor(version))) })
+            options.encoding = "UTF-8"
+        }
+    }
     tasks.register<JavaExec>("verify_$version") {
         group = "verification"
         description = "Loads the plugins against Minecraft $version without starting a server."
         dependsOn(agentJar)
+        compileLoader?.let { dependsOn(it) }
         val workDir = layout.buildDirectory.dir("harness/$version").get().asFile
         javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(jdkFor(version))) })
         mainClass.set("io.github.slimefun5.harness.HarnessMain")
@@ -49,7 +81,8 @@ val versionTasks = versions.map { version ->
             workDir.deleteRecursively()
             workDir.mkdirs()
             val agent = agentJar.get().outputs.files.singleFile
-            classpath = files(agent) + files(serverClasspath(version))
+            val loader = if (compileLoader != null) files(loaderClasses) else files()
+            classpath = files(agent) + loader + files(serverClasspath(version))
             jvmArgs("-javaagent:${agent.absolutePath}", "-Xmx2g")
             args("--version", version, "--report", reportFile(version).absolutePath,
                 "--plugins", pluginJars.joinToString(File.pathSeparator) { it.absolutePath })

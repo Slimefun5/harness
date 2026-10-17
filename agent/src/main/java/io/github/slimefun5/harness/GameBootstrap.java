@@ -20,22 +20,40 @@ final class GameBootstrap {
             default:
                 Reflect.invokeStatic("net.minecraft.SharedConstants", "tryDetectVersion");
                 Reflect.invokeStatic("net.minecraft.server.Bootstrap", "bootStrap");
-                installBuiltInRegistries(layout);
         }
     }
 
     /**
-     * @implNote From 1.20.5 item meta resolves its item type through {@code CraftRegistry}, which a live
-     *           server fills with the full registry access during world load. The built-in registries are
-     *           enough for items and materials.
+     * Loads vanilla's built-in datapack into the allocated console through this version's compiled loader,
+     * then gives {@code CraftRegistry} the console's registry access exactly as the {@code CraftServer}
+     * constructor does. A version with no loader gets only the built-in registries.
+     *
+     * @implNote From 1.20.5 item meta resolves its item type through {@code CraftRegistry}, so every Mojang-
+     *           mapped version needs one of the two.
      */
+    static void loadVanillaData(ServerLayout layout, Object console) throws ReflectiveOperationException {
+        Class<?> loader = Reflect.firstClass(DATAPACK_LOADER);
+        if (loader != null) {
+            loader.getMethod("load", Object.class).invoke(null, console);
+            Object access = Reflect.findMethod(console.getClass(), "registryAccess").invoke(console);
+            setCraftRegistry(layout, access);
+        } else if (layout.era == ServerLayout.Era.MOJANG_MAPPED) {
+            installBuiltInRegistries(layout);
+        }
+    }
+
+    private static final String DATAPACK_LOADER = "io.github.slimefun5.harness.loader.VanillaDatapack";
+
+    private static void setCraftRegistry(ServerLayout layout, Object access) throws ReflectiveOperationException {
+        Class<?> registryAccess = Class.forName("net.minecraft.core.RegistryAccess");
+        Class.forName(layout.craft("CraftRegistry")).getMethod("setMinecraftRegistry", registryAccess).invoke(null, access);
+    }
+
     private static void installBuiltInRegistries(ServerLayout layout) throws ReflectiveOperationException {
         Class<?> registryAccess = Class.forName("net.minecraft.core.RegistryAccess");
         Class<?> registry = Class.forName("net.minecraft.core.Registry");
         Object registryOfRegistries = Class.forName("net.minecraft.core.registries.BuiltInRegistries").getField("REGISTRY").get(null);
         Object access = registryAccess.getMethod("fromRegistryOfRegistries", registry).invoke(null, registryOfRegistries);
-        Object frozen = registryAccess.getMethod("freeze").invoke(access);
-        Class.forName(layout.craft("CraftRegistry"))
-            .getMethod("setMinecraftRegistry", registryAccess).invoke(null, frozen);
+        setCraftRegistry(layout, registryAccess.getMethod("freeze").invoke(access));
     }
 }

@@ -25,10 +25,12 @@ import org.bukkit.plugin.messaging.StandardMessenger;
 final class HarnessServer {
 
     final Server server;
+    final Object console;
     final Object scheduler;
 
-    private HarnessServer(Server server, Object scheduler) {
+    private HarnessServer(Server server, Object console, Object scheduler) {
         this.server = server;
+        this.console = console;
         this.scheduler = scheduler;
     }
 
@@ -55,7 +57,7 @@ final class HarnessServer {
         attachPaperPluginManager(server, commandMap, pluginManager);
         Bukkit.setServer(server);
         registerConstructorStatics(layout, server);
-        return new HarnessServer(server, scheduler);
+        return new HarnessServer(server, console, scheduler);
     }
 
     /**
@@ -117,10 +119,10 @@ final class HarnessServer {
      */
     private static void installCommodoreReroutes(ServerLayout layout, Server server) throws ReflectiveOperationException {
         Class<?> magicNumbers = Reflect.firstClass(layout.craft("util.CraftMagicNumbers"));
-        java.lang.reflect.Method getCommodore = magicNumbers == null ? null : findMethod(magicNumbers, "getCommodore");
-        if (getCommodore == null) {
+        if (magicNumbers == null || !hasMethod(magicNumbers, "getCommodore")) {
             return;
         }
+        java.lang.reflect.Method getCommodore = Reflect.findMethod(magicNumbers, "getCommodore");
         Set<String> activeCompatibilities = new HashSet<>();
         Reflect.set(server, "activeCompatibilities", activeCompatibilities);
         Object commodore = getCommodore.invoke(magicNumbers.getField("INSTANCE").get(null));
@@ -128,13 +130,13 @@ final class HarnessServer {
         commodore.getClass().getMethod("updateReroute", Predicate.class).invoke(commodore, isActive);
     }
 
-    private static java.lang.reflect.Method findMethod(Class<?> type, String name) {
-        for (java.lang.reflect.Method method : type.getMethods()) {
-            if (method.getName().equals(name) && method.getParameterCount() == 0) {
-                return method;
-            }
+    private static boolean hasMethod(Class<?> type, String name) {
+        try {
+            Reflect.findMethod(type, name);
+            return true;
+        } catch (NoSuchMethodException absent) {
+            return false;
         }
-        return null;
     }
 
     /**

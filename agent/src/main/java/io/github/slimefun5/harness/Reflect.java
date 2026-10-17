@@ -58,6 +58,16 @@ final class Reflect {
         throw new NoSuchMethodException(className + " has none of " + String.join(", ", methods));
     }
 
+    /** The first public no-argument method of that name, including inherited ones. */
+    static Method findMethod(Class<?> type, String name) throws NoSuchMethodException {
+        for (Method method : type.getMethods()) {
+            if (method.getName().equals(name) && method.getParameterCount() == 0) {
+                return method;
+            }
+        }
+        throw new NoSuchMethodException(type.getName() + "." + name + "()");
+    }
+
     static Field field(Class<?> owner, String name) {
         for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
             try {

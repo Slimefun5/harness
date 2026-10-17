@@ -9,6 +9,7 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.FileHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -25,10 +26,17 @@ final class WarningLog extends Handler {
 
     private final List<String> records = Collections.synchronizedList(new ArrayList<String>());
 
-    static WarningLog attachToRoot() {
+    /** Collects warnings from the root logger, and writes every record at INFO and above to {@code fullLog}. */
+    static WarningLog attachToRoot(File fullLog) throws IOException {
         WarningLog log = new WarningLog();
         log.setLevel(Level.WARNING);
-        Logger.getLogger("").addHandler(log);
+        Logger root = Logger.getLogger("");
+        root.addHandler(log);
+        FileHandler everything = new FileHandler(fullLog.getAbsolutePath());
+        everything.setEncoding(StandardCharsets.UTF_8.name());
+        everything.setFormatter(new SimpleFormatter());
+        everything.setLevel(Level.INFO);
+        root.addHandler(everything);
         return log;
     }
 

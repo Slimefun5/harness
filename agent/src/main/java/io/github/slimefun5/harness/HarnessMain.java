@@ -25,13 +25,15 @@ public final class HarnessMain {
     public static void main(String[] args) throws Exception {
         Arguments arguments = Arguments.parse(args);
         ServerOverrides.PrimaryThread.mainThread = Thread.currentThread();
-        WarningLog log = WarningLog.attachToRoot();
+        arguments.report.getParentFile().mkdirs();
+        WarningLog log = WarningLog.attachToRoot(new File(arguments.report.getParentFile(), "harness.log"));
         long start = System.nanoTime();
         String failure = null;
         try {
             ServerLayout layout = ServerLayout.detect();
             GameBootstrap.run(layout);
             HarnessServer harness = HarnessServer.install(layout, arguments.version, Logger.getLogger("Minecraft"));
+            GameBootstrap.loadVanillaData(layout, harness.console);
             PluginBoot.loadAndEnable(harness.server.getPluginManager(), arguments.plugins, new File("plugins"), log);
             new VirtualClock(harness.scheduler).advance(STARTUP_TICKS, log);
         } catch (Throwable fatal) {
