@@ -1,0 +1,2 @@
+kind: generic
+description: Tests Slimefun and its addons against every supported Minecraft version without starting a server.
