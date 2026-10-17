@@ -1,6 +1,9 @@
 package io.github.slimefun5.harness;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
@@ -12,6 +15,7 @@ import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.command.SimpleCommandMap;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.SimplePluginManager;
 import org.bukkit.plugin.SimpleServicesManager;
 import org.bukkit.plugin.java.JavaPluginLoader;
@@ -46,6 +50,8 @@ final class HarnessServer {
         Reflect.set(server, "bukkitVersion", version + "-R0.1-SNAPSHOT");
         Reflect.set(server, "worlds", new LinkedHashMap<String, Object>());
         setDefaultMinimumApi(server);
+        Reflect.set(server, "configuration", bundledDefaults("configurations/bukkit.yml"));
+        Reflect.set(server, "commandsConfiguration", bundledDefaults("configurations/commands.yml"));
         Object scheduler = Class.forName(layout.craft("scheduler.CraftScheduler")).getConstructor().newInstance();
         Reflect.set(server, "scheduler", scheduler);
         Reflect.set(server, "servicesManager", new SimpleServicesManager());
@@ -137,6 +143,19 @@ final class HarnessServer {
         } catch (NoSuchMethodException absent) {
             return false;
         }
+    }
+
+    /** The configuration a fresh server starts from: the defaults the version's own jar ships. */
+    private static YamlConfiguration bundledDefaults(String resource) throws ReflectiveOperationException {
+        InputStream in = HarnessServer.class.getClassLoader().getResourceAsStream(resource);
+        if (in == null) {
+            throw new ReflectiveOperationException("The server jar ships no " + resource);
+        }
+        YamlConfiguration defaults = YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
+        YamlConfiguration configuration = new YamlConfiguration();
+        configuration.setDefaults(defaults);
+        configuration.options().copyDefaults(true);
+        return configuration;
     }
 
     /**

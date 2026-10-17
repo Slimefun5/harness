@@ -4,38 +4,44 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 
-/** Loads real plugin jars the way a server's start-up does, then enables them in the given order. */
+/**
+ * Loads the plugin jars exactly as a server's start-up does: all of them from the plugins folder in one
+ * {@code loadPlugins} call, which builds the dependency graph and the load order, then {@code onLoad} and
+ * enable in that order.
+ */
 final class PluginBoot {
 
     private PluginBoot() {}
 
-    static List<Plugin> loadAndEnable(PluginManager manager, List<File> jars, File pluginsFolder, WarningLog log) throws IOException {
+    static Plugin[] loadAndEnable(PluginManager manager, List<File> jars, File pluginsFolder, WarningLog log) throws IOException {
         pluginsFolder.mkdirs();
-        List<Plugin> loaded = new ArrayList<>();
         for (File jar : jars) {
-            File copy = new File(pluginsFolder, jar.getName());
-            Files.copy(jar.toPath(), copy.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(jar.toPath(), new File(pluginsFolder, jar.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        }
+        Plugin[] plugins = manager.loadPlugins(pluginsFolder);
+        if (plugins.length < jars.size()) {
+            log.harnessFailure("loaded " + plugins.length + " of " + jars.size() + " plugin jars",
+                new IllegalStateException("see the server log above for why a jar was rejected"));
+        }
+        for (Plugin plugin : plugins) {
             try {
-                Plugin plugin = manager.loadPlugin(copy);
                 plugin.onLoad();
-                loaded.add(plugin);
             } catch (Throwable failure) {
-                log.harnessFailure("could not load " + jar.getName(), failure);
+                log.harnessFailure("onLoad failed for " + plugin.getName(), failure);
             }
         }
-        for (Plugin plugin : loaded) {
+        for (Plugin plugin : plugins) {
             try {
                 manager.enablePlugin(plugin);
             } catch (Throwable failure) {
                 log.harnessFailure("could not enable " + plugin.getName(), failure);
             }
         }
-        return loaded;
+        return plugins;
     }
 }
