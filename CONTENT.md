@@ -1,7 +1,7 @@
 ## What it does
 
 Loads Slimefun and its addons against the real game code of every supported Minecraft version, from 1.8.8
-to 26.x, **without starting a server**, then plays through what they registered with simulated players, and
+to 26.x, **without starting a server**, then runs Slimefun's own checks against what they registered, and
 fails when anything they print is a warning or an error that has not been accepted.
 
 Each version runs in its own JVM, on the JDK that version's servers run on. The harness:
@@ -12,19 +12,21 @@ Each version runs in its own JVM, on the JDK that version's servers run on. The 
   scheduler, plugin manager and command map, so plugins load and enable through the server's real code;
 - rewrites, as the classes load, only the few server methods that would read a running game;
 - advances the scheduler on a virtual clock, so delayed startup tasks run in milliseconds;
-- runs Slimefun's own registry checks (items, recipes, menu presets) through the check system the plugin
-  ships, up to `-Pstage=<off|low|medium|high|max>` (default `max`);
-- then runs every scenario a plugin offers: a probe plugin places every machine as a player would, opens
-  each menu once per language, and clicks every slot with every click type, failing when a click makes
-  items appear or vanish.
+- runs Slimefun's own checks through the check system the plugin ships, up to
+  `-Pstage=<off|low|medium|high|max>` (default `max`): the registry checks (items, recipes, menu presets,
+  addon staleness), and from `medium` the checks that place every machine as a player would, open each menu
+  once per language, and click every slot with every click type, failing when a click makes items appear or
+  vanish.
 
-## Simulated players and blocks
+## Sandbox players and blocks
 
-The scenarios act through a world, blocks, entities and players held in memory. Their Bukkit interfaces are
-generated for each version, so one implementation covers both shapes `InventoryView` has had, but every item
-in them is a real server item in a real server inventory, and every event goes through the plugins' real
-listeners. A call into one of them that the harness does not answer yet is logged as `[gap]` and fails the
-run, so a check that could not really run never passes.
+The deeper checks act in Slimefun's own checks sandbox: a world, blocks, entities and players held in memory,
+the same sandbox a live server uses for `/sf check`. Every item in it is a real server item in a real server
+inventory, and every event goes through the plugins' real listeners. Only in the harness are the sandbox's
+players spliced in as the server's online players and its world registered with the server; on a live server
+neither happens. A call the sandbox cannot answer yet is reported as `[check:sandbox-gap]` and
+fails the run, so a check that could not really run never passes. Universal menus are skipped, because the
+sandbox refuses them, and each skip is logged.
 
 ## Running it
 

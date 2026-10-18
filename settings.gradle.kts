@@ -5,4 +5,3 @@ plugins {
 rootProject.name = "harness"
 
 include("agent")
-include("probe")

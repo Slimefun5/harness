@@ -9,21 +9,17 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.logging.Logger;
 
 import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.RegisteredServiceProvider;
-
-import io.github.slimefun5.harness.simulation.HarnessContext;
-import io.github.slimefun5.harness.simulation.Scenario;
-import io.github.slimefun5.harness.simulation.Simulation;
 
 /**
  * Runs inside one version's JVM: bootstraps that version's game data, installs the harness server, loads and
- * enables the plugins, runs the start-up ticks and then every registered {@link Scenario}, and writes a report
- * next to the given path.
+ * enables the plugins, runs the start-up ticks and then Slimefun's own checks, and writes a report next to the
+ * given path.
  */
 public final class HarnessMain {
 
@@ -52,7 +48,6 @@ public final class HarnessMain {
             clock.advance(STARTUP_TICKS, log);
             IntConsumer advanceTicks = ticks -> clock.advance(ticks, log);
             runCoreChecks(harness.server, arguments.stage, advanceTicks, log);
-            runScenarios(harness.server, new Simulation(advanceTicks), log);
         } catch (Throwable fatal) {
             Throwable cause = rootCause(fatal);
             log.harnessFailure("the harness stopped", cause);
@@ -64,35 +59,25 @@ public final class HarnessMain {
         System.exit(0);
     }
 
-    /** Runs Slimefun's own registry checks; a core jar without them is a harness failure, not a pass. */
+    /**
+     * Runs Slimefun's own checks, which place its machines and click its menus with the players of core's
+     * sandbox; a core jar without them is a harness failure, not a pass.
+     */
     private static void runCoreChecks(Server server, String stage, IntConsumer advanceTicks, WarningLog log) {
-        HarnessContext.set("core checks");
+        String context = "core checks";
+        HarnessContext.set(context);
+        Consumer<String> activity = what -> HarnessContext.set(what == null ? context : context + ": " + what);
         try {
             Plugin slimefun = server.getPluginManager().getPlugin(SLIMEFUN_PLUGIN);
             if (slimefun == null) {
                 throw new IllegalStateException("The " + SLIMEFUN_PLUGIN + " plugin is not loaded, so its checks cannot run");
             }
             Class<?> entry = slimefun.getClass().getClassLoader().loadClass(CHECK_ENTRY_CLASS);
-            entry.getMethod("run", String.class, IntConsumer.class).invoke(null, stage, advanceTicks);
+            entry.getMethod("run", String.class, IntConsumer.class, Consumer.class).invoke(null, stage, advanceTicks, activity);
         } catch (Throwable failure) {
             log.harnessFailure("core checks stopped", rootCause(failure));
         } finally {
             HarnessContext.clear();
-        }
-    }
-
-    /** Runs every scenario a plugin registered, each on its own, so one that crashes does not hide the rest. */
-    private static void runScenarios(Server server, Simulation simulation, WarningLog log) {
-        for (RegisteredServiceProvider<Scenario> registration : server.getServicesManager().getRegistrations(Scenario.class)) {
-            Scenario scenario = registration.getProvider();
-            HarnessContext.set("scenario " + scenario.name());
-            try {
-                scenario.run(simulation);
-            } catch (Throwable failure) {
-                log.harnessFailure("scenario " + scenario.name() + " stopped", rootCause(failure));
-            } finally {
-                HarnessContext.clear();
-            }
         }
     }
 

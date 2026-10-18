@@ -1,15 +1,18 @@
 package io.github.slimefun5.harness;
 
 import java.io.File;
+import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import net.bytebuddy.implementation.bind.annotation.RuntimeType;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
-
-import io.github.slimefun5.harness.simulation.Simulation;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
 
 /** Replacement bodies for {@code CraftServer} methods that read state only a running game has. */
 public final class ServerOverrides {
@@ -37,7 +40,7 @@ public final class ServerOverrides {
         private OnlinePlayers() {}
 
         public static List<?> getOnlinePlayers() {
-            return Simulation.onlinePlayers();
+            return SandboxPlayers.online();
         }
     }
 
@@ -47,15 +50,15 @@ public final class ServerOverrides {
         private PlayerLookup() {}
 
         public static Player getPlayer(UUID uniqueId) {
-            return Simulation.onlinePlayer(uniqueId);
+            return SandboxPlayers.byId(uniqueId);
         }
 
         public static Player getPlayer(String name) {
-            return Simulation.onlinePlayer(name);
+            return SandboxPlayers.byName(name);
         }
 
         public static Player getPlayerExact(String name) {
-            return Simulation.onlinePlayer(name);
+            return SandboxPlayers.byName(name);
         }
     }
 
@@ -103,7 +106,77 @@ public final class ServerOverrides {
         private OnlinePlayerArray() {}
 
         public static Player[] getOnlinePlayers() {
-            return Simulation.onlinePlayers().toArray(new Player[0]);
+            return SandboxPlayers.online().toArray(new Player[0]);
+        }
+    }
+
+    /**
+     * The players of core's checks sandbox, the only players a harness run has.
+     *
+     * @implNote Core is loaded by its plugin's class loader long after this agent, so its {@code Sandbox} is
+     *           looked up by name once Slimefun is loaded; before that there is no sandbox and so no player.
+     */
+    static final class SandboxPlayers {
+
+        private static final String SLIMEFUN_PLUGIN = "Slimefun";
+        private static final String SANDBOX_CLASS = "io.github.thebusybiscuit.slimefun5.core.checks.sandbox.Sandbox";
+
+        private static volatile SandboxMethods methods;
+
+        private SandboxPlayers() {}
+
+        @SuppressWarnings("unchecked")
+        static List<Player> online() {
+            SandboxMethods resolved = methods();
+            return resolved == null ? Collections.<Player>emptyList() : (List<Player>) invoke(resolved.online);
+        }
+
+        static Player byId(UUID uniqueId) {
+            SandboxMethods resolved = methods();
+            return resolved == null ? null : (Player) invoke(resolved.byId, uniqueId);
+        }
+
+        static Player byName(String name) {
+            SandboxMethods resolved = methods();
+            return resolved == null ? null : (Player) invoke(resolved.byName, name);
+        }
+
+        private static SandboxMethods methods() {
+            if (methods == null) {
+                PluginManager plugins = Bukkit.getServer() == null ? null : Bukkit.getPluginManager();
+                Plugin slimefun = plugins == null ? null : plugins.getPlugin(SLIMEFUN_PLUGIN);
+                if (slimefun == null) {
+                    return null;
+                }
+                methods = new SandboxMethods(slimefun.getClass().getClassLoader());
+            }
+            return methods;
+        }
+
+        private static Object invoke(Method method, Object... arguments) {
+            try {
+                return method.invoke(null, arguments);
+            } catch (ReflectiveOperationException failure) {
+                throw new IllegalStateException("Could not ask core's sandbox for its players", failure);
+            }
+        }
+    }
+
+    private static final class SandboxMethods {
+
+        final Method online;
+        final Method byId;
+        final Method byName;
+
+        SandboxMethods(ClassLoader slimefunClasses) {
+            try {
+                Class<?> sandbox = slimefunClasses.loadClass(SandboxPlayers.SANDBOX_CLASS);
+                online = sandbox.getMethod("onlinePlayers");
+                byId = sandbox.getMethod("onlinePlayer", UUID.class);
+                byName = sandbox.getMethod("onlinePlayer", String.class);
+            } catch (ReflectiveOperationException failure) {
+                throw new IllegalStateException("Slimefun has no checks sandbox, so the harness has no players to offer", failure);
+            }
         }
     }
 }

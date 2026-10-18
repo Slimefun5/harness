@@ -1,7 +1,0 @@
-name: SlimefunHarnessProbe
-version: ${version}
-main: io.github.slimefun5.harness.probe.HarnessProbe
-# Low so the one jar loads on every version the harness runs (1.8 to 1.12 ignore it).
-api-version: '1.13'
-depend:
-- Slimefun

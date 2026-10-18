@@ -30,7 +30,7 @@ tasks {
         options.encoding = "UTF-8"
     }
     jar {
-        // The probe compiles against this one; the harness runs the shadow jar, which must not share its file.
+        // The harness runs the shadow jar, which must not share this one's file.
         archiveClassifier.set("plain")
         manifest {
             attributes(
