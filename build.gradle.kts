@@ -7,7 +7,11 @@ plugins {
 evaluationDependsOn(":agent")
 
 val serverRoot =file(property("harness.serverRoot").toString())
-val pluginJars = property("harness.plugins").toString().split(',').map { file(it.trim()) }
+val slimefunBuild = file(property("harness.slimefunBuild").toString())
+val manifestFile = file(property("harness.manifest").toString())
+val pluginJars by lazy {
+    findProperty("harness.plugins")?.toString()?.split(',')?.map { file(it.trim()) } ?: coreAndAddonJars()
+}
 val versions = (findProperty("versions") ?: property("harness.versions")).toString().split(',').map { it.trim() }
 val checkStage = (findProperty("stage") ?: "max").toString()
 val agentJar = project(":agent").tasks.named("shadowJar")
@@ -52,6 +56,59 @@ fun compareVersions(left: String, right: String): Int {
 fun loaderFor(version: String): File? = file("loaders").listFiles { candidate -> candidate.isDirectory }
     ?.filter { compareVersions(it.name, version) <= 0 }
     ?.maxWithOrNull { a, b -> compareVersions(a.name, b.name) }
+
+data class ManifestAddon(val id: String, val repositoryName: String, val dependencies: List<String>)
+
+fun manifestAddons(): List<ManifestAddon> {
+    val manifest = groovy.json.JsonSlurper().parse(manifestFile) as Map<*, *>
+    return (manifest["addons"] as List<*>).map { it as Map<*, *> }.map { entry ->
+        ManifestAddon(
+            entry["id"] as String,
+            (entry["repo"] as String).substringAfter('/'),
+            (entry["dependencies"] as List<*>).map { it as String })
+    }
+}
+
+/** Each addon after the addons it depends on; a dependency that is a library is shaded into the addon and orders nothing. */
+fun inDependencyOrder(addons: List<ManifestAddon>): List<ManifestAddon> {
+    val addonsById = addons.associateBy { it.id }
+    val ordered = LinkedHashSet<ManifestAddon>()
+    val visiting = HashSet<ManifestAddon>()
+    fun visit(addon: ManifestAddon) {
+        if (addon in ordered || !visiting.add(addon)) {
+            return
+        }
+        addon.dependencies.mapNotNull { addonsById[it] }.forEach { visit(it) }
+        ordered.add(addon)
+    }
+    addons.forEach { visit(it) }
+    return ordered.toList()
+}
+
+fun newestJar(directory: File, namePrefix: String = ""): File? = directory
+    .listFiles { candidate ->
+        candidate.isFile && candidate.name.startsWith(namePrefix) && candidate.name.endsWith(".jar")
+            && !candidate.name.endsWith("-sources.jar") && !candidate.name.endsWith("-javadoc.jar")
+    }
+    ?.maxByOrNull { it.lastModified() }
+
+fun coreJar(): File {
+    val libraries = File(slimefunBuild, "libs")
+    return newestJar(libraries, "Slimefun-") ?: throw GradleException("No Slimefun jar under $libraries; build core first")
+}
+
+/** Core plus every manifest addon built by core's addon build; an addon that has no jar is left out, never failing the run. */
+fun coreAndAddonJars(): List<File> {
+    val addonJars = inDependencyOrder(manifestAddons()).mapNotNull { addon ->
+        val libraries = File(slimefunBuild, "addons-src/${addon.repositoryName}/build/libs")
+        newestJar(libraries).also { jar ->
+            if (jar == null) {
+                logger.lifecycle("INFO: running without ${addon.repositoryName}: no built jar under $libraries")
+            }
+        }
+    }
+    return listOf(coreJar()) + addonJars
+}
 
 fun reportFile(version: String) = layout.buildDirectory.file("harness/$version/report.properties").get().asFile
 

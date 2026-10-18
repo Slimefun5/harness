@@ -36,7 +36,12 @@ sandbox refuses them, and each skip is logged.
 ```
 
 `harness.serverRoot` in `gradle.properties` points at a folder holding one folder per version with that
-version's Paper server jar (and its `libraries/` from 1.18). `harness.plugins` lists the plugin jars to load.
+version's Paper server jar (and its `libraries/` from 1.18).
+
+Every run loads Slimefun and every addon in the manifest (`harness.manifest`): the newest core jar under
+`harness.slimefunBuild`'s `libs/`, and each addon's jar from `addons-src/<repository>/build/libs/`, where core's
+addon build leaves it. An addon with no built jar is left out with one `INFO` line naming it, and the run goes
+on without it. `-Pharness.plugins=<jar>,<jar>` loads only the jars it lists instead.
 
 Each version writes `build/harness/<version>/`: `report.properties` (the verdict), `warnings.txt` (what
 failed the run), `accepted.txt`, `harness.log` and Paper's own `logs/latest.log`.
