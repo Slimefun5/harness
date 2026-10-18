@@ -12,9 +12,11 @@ Each version runs in its own JVM, on the JDK that version's servers run on. The 
   scheduler, plugin manager and command map, so plugins load and enable through the server's real code;
 - rewrites, as the classes load, only the few server methods that would read a running game;
 - advances the scheduler on a virtual clock, so delayed startup tasks run in milliseconds;
-- then runs every scenario a plugin offers: a probe plugin checks every registered item, recipe and menu,
-  places every machine as a player would, opens each menu once per language, and clicks every slot with
-  every click type, failing when a click makes items appear or vanish.
+- runs Slimefun's own registry checks (items, recipes, menu presets) through the check system the plugin
+  ships, up to `-Pstage=<off|low|medium|high|max>` (default `max`);
+- then runs every scenario a plugin offers: a probe plugin places every machine as a player would, opens
+  each menu once per language, and clicks every slot with every click type, failing when a click makes
+  items appear or vanish.
 
 ## Simulated players and blocks
 
@@ -28,7 +30,7 @@ run, so a check that could not really run never passes.
 
 ```
 ./gradlew verifyAllVersions
-./gradlew verifyAllVersions -Pversions=1.8.8,26.2
+./gradlew verifyAllVersions -Pversions=1.8.8,26.2 -Pstage=medium
 ```
 
 `harness.serverRoot` in `gradle.properties` points at a folder holding one folder per version with that

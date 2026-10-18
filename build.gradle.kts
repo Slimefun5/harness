@@ -10,8 +10,9 @@ evaluationDependsOn(":probe")
 val serverRoot =file(property("harness.serverRoot").toString())
 val pluginJars = property("harness.plugins").toString().split(',').map { file(it.trim()) }
 val versions = (findProperty("versions") ?: property("harness.versions")).toString().split(',').map { it.trim() }
+val checkStage = (findProperty("stage") ?: "max").toString()
 val agentJar = project(":agent").tasks.named("shadowJar")
-/** Loaded after every configured plugin, so its checks see everything they registered. */
+/** Loaded after every configured plugin; it offers the scenarios that need simulated players. */
 val probeJar = project(":probe").tasks.named("shadowJar")
 
 /** The JDK each version is run on: the oldest that version's real servers run on, so a newer-JDK-only call fails here too. */
@@ -88,7 +89,7 @@ val versionTasks = versions.map { version ->
             classpath = files(agent) + loader + files(serverClasspath(version))
             jvmArgs("-javaagent:${agent.absolutePath}", "-Xmx2g")
             args("--version", version, "--report", reportFile(version).absolutePath,
-                "--allowlist", file("allowlist.txt").absolutePath,
+                "--allowlist", file("allowlist.txt").absolutePath, "--stage", checkStage,
                 "--plugins", (pluginJars + probeJar.get().outputs.files.singleFile).joinToString(File.pathSeparator) { it.absolutePath })
         }
     }

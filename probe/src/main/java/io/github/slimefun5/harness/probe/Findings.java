@@ -15,10 +15,6 @@ final class Findings {
         this.logger = logger;
     }
 
-    void report(RegistryCheck check, String subject, String problem) {
-        report(check.name(), subject, problem);
-    }
-
     /** A finding names what it is about itself, so the harness's step context is left off it. */
     void report(String check, String subject, String problem) {
         count++;

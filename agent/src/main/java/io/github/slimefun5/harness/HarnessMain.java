@@ -9,9 +9,11 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.IntConsumer;
 import java.util.logging.Logger;
 
 import org.bukkit.Server;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
 import io.github.slimefun5.harness.simulation.HarnessContext;
@@ -27,6 +29,9 @@ public final class HarnessMain {
 
     /** Long enough for the delayed start-up tasks plugins schedule after enable (Slimefun's audits run at 20 to 100 ticks). */
     private static final int STARTUP_TICKS = 200;
+
+    private static final String SLIMEFUN_PLUGIN = "Slimefun";
+    private static final String CHECK_ENTRY_CLASS = "io.github.thebusybiscuit.slimefun5.core.checks.HarnessEntry";
 
     private HarnessMain() {}
 
@@ -45,7 +50,9 @@ public final class HarnessMain {
             PluginBoot.loadAndEnable(harness.server.getPluginManager(), arguments.plugins, new File("plugins"), log);
             VirtualClock clock = new VirtualClock(harness.scheduler);
             clock.advance(STARTUP_TICKS, log);
-            runScenarios(harness.server, new Simulation(ticks -> clock.advance(ticks, log)), log);
+            IntConsumer advanceTicks = ticks -> clock.advance(ticks, log);
+            runCoreChecks(harness.server, arguments.stage, advanceTicks, log);
+            runScenarios(harness.server, new Simulation(advanceTicks), log);
         } catch (Throwable fatal) {
             Throwable cause = rootCause(fatal);
             log.harnessFailure("the harness stopped", cause);
@@ -55,6 +62,23 @@ public final class HarnessMain {
         writeReport(arguments.report, log.records(), Allowlist.read(arguments.allowlist), failure,
             (System.nanoTime() - start) / 1_000_000);
         System.exit(0);
+    }
+
+    /** Runs Slimefun's own registry checks; a core jar without them is a harness failure, not a pass. */
+    private static void runCoreChecks(Server server, String stage, IntConsumer advanceTicks, WarningLog log) {
+        HarnessContext.set("core checks");
+        try {
+            Plugin slimefun = server.getPluginManager().getPlugin(SLIMEFUN_PLUGIN);
+            if (slimefun == null) {
+                throw new IllegalStateException("The " + SLIMEFUN_PLUGIN + " plugin is not loaded, so its checks cannot run");
+            }
+            Class<?> entry = slimefun.getClass().getClassLoader().loadClass(CHECK_ENTRY_CLASS);
+            entry.getMethod("run", String.class, IntConsumer.class).invoke(null, stage, advanceTicks);
+        } catch (Throwable failure) {
+            log.harnessFailure("core checks stopped", rootCause(failure));
+        } finally {
+            HarnessContext.clear();
+        }
     }
 
     /** Runs every scenario a plugin registered, each on its own, so one that crashes does not hide the rest. */
@@ -109,6 +133,7 @@ public final class HarnessMain {
         String version;
         File report;
         File allowlist;
+        String stage = "max";
         final List<File> plugins = new ArrayList<>();
 
         static Arguments parse(String[] args) {
@@ -123,6 +148,9 @@ public final class HarnessMain {
                         break;
                     case "--allowlist":
                         parsed.allowlist = new File(args[i + 1]);
+                        break;
+                    case "--stage":
+                        parsed.stage = args[i + 1];
                         break;
                     case "--plugins":
                         for (String path : args[i + 1].split(File.pathSeparator)) {
