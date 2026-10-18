@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -109,9 +110,17 @@ public final class HarnessMain {
         }
     }
 
+    /** Streams the records: an addon failing on every click logs enough of them to exhaust the heap if joined first. */
     private static void writeRecords(File file, List<String> records) throws IOException {
         String separator = System.lineSeparator() + System.lineSeparator();
-        Files.write(file.toPath(), String.join(separator, records).getBytes(StandardCharsets.UTF_8));
+        try (Writer out = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
+            for (int index = 0; index < records.size(); index++) {
+                if (index > 0) {
+                    out.write(separator);
+                }
+                out.write(records.get(index));
+            }
+        }
     }
 
     private static final class Arguments {
