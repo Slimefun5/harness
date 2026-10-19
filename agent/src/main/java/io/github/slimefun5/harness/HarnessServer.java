@@ -14,6 +14,7 @@ import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
+import org.bukkit.Warning;
 import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.SimplePluginManager;
@@ -52,12 +53,14 @@ final class HarnessServer {
         setDefaultMinimumApi(server);
         Reflect.set(server, "configuration", bundledDefaults("configurations/bukkit.yml"));
         Reflect.set(server, "commandsConfiguration", bundledDefaults("configurations/commands.yml"));
+        setWarningState(server);
         Object scheduler = Class.forName(layout.craft("scheduler.CraftScheduler")).getConstructor().newInstance();
         Reflect.set(server, "scheduler", scheduler);
         Reflect.set(server, "servicesManager", new SimpleServicesManager());
         Reflect.set(server, "messenger", new StandardMessenger());
         SimpleCommandMap commandMap = commandMap(layout, server);
         Reflect.set(server, "commandMap", commandMap);
+        Reflect.set(server, "helpMap", Class.forName(layout.craft("help.SimpleHelpMap")).getConstructor(craftServer).newInstance(server));
         SimplePluginManager pluginManager = pluginManager(server, commandMap);
         Reflect.set(server, "pluginManager", pluginManager);
         attachPaperPluginManager(server, commandMap, pluginManager);
@@ -169,6 +172,12 @@ final class HarnessServer {
         }
         Object none = field.getType() == String.class ? "none" : field.getType().getField("NONE").get(null);
         field.set(server, none);
+    }
+
+    /** {@code bukkit.yml}'s {@code settings.deprecated-verbose}, which registering any listener consults. */
+    private static void setWarningState(Server server) throws ReflectiveOperationException {
+        String configured = ((YamlConfiguration) Reflect.get(server, "configuration")).getString("settings.deprecated-verbose");
+        Reflect.set(server, "warningState", Warning.WarningState.value(configured));
     }
 
     /** What Paper's {@code Main} builds from the {@code --plugins} launch option. */
