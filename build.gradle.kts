@@ -9,6 +9,7 @@ evaluationDependsOn(":agent")
 val serverRoot =file(property("harness.serverRoot").toString())
 val slimefunBuild = file(property("harness.slimefunBuild").toString())
 val manifestFile = file(property("harness.manifest").toString())
+val storageDriver = file(property("harness.storageDriver").toString())
 val pluginJars by lazy {
     findProperty("harness.plugins")?.toString()?.split(',')?.map { file(it.trim()) } ?: coreAndAddonJars()
 }
@@ -110,6 +111,14 @@ fun coreAndAddonJars(): List<File> {
     return listOf(coreJar()) + addonJars
 }
 
+/** Core downloads its storage driver on enable when its libraries folder lacks it, which can stall a run for hours. */
+fun seedStorageDriver(workDir: File) {
+    if (!storageDriver.isFile) {
+        throw GradleException("No storage driver at $storageDriver; set harness.storageDriver to a cached h2 jar")
+    }
+    storageDriver.copyTo(File(workDir, "plugins/Slimefun/libraries/${storageDriver.name}"))
+}
+
 fun reportFile(version: String) = layout.buildDirectory.file("harness/$version/report.properties").get().asFile
 
 val versionTasks = versions.map { version ->
@@ -138,6 +147,7 @@ val versionTasks = versions.map { version ->
         doFirst {
             workDir.deleteRecursively()
             workDir.mkdirs()
+            seedStorageDriver(workDir)
             val agent = agentJar.get().outputs.files.singleFile
             val loader = if (compileLoader != null) files(loaderClasses) else files()
             classpath = files(agent) + loader + files(serverClasspath(version))
