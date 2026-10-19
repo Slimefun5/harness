@@ -37,10 +37,16 @@ public final class HarnessAgent {
                 .intercept(MethodDelegation.to(ServerOverrides.OnlinePlayerArray.class))
                 .method(named("getPlayer").or(named("getPlayerExact")).and(takesArguments(String.class).or(takesArguments(UUID.class))))
                 .intercept(MethodDelegation.to(ServerOverrides.PlayerLookup.class))
+                .method(named("getOfflinePlayer").and(takesArguments(String.class).or(takesArguments(UUID.class))))
+                .intercept(MethodDelegation.to(ServerOverrides.OfflinePlayerLookup.class))
                 .method(named("getConsoleSender").and(takesArguments(0)))
                 .intercept(MethodDelegation.to(ServerOverrides.ConsoleSender.class))
                 .method(named("getPluginsFolder").and(takesArguments(0)))
                 .intercept(MethodDelegation.to(ServerOverrides.PluginsFolder.class)))
+            .type(named("io.papermc.paper.util.TickThread").or(named("ca.spottedleaf.moonrise.common.util.TickThread")))
+            .transform((builder, type, classLoader, module, domain) -> builder
+                .method(named("isTickThread").and(takesArguments(0)))
+                .intercept(MethodDelegation.to(ServerOverrides.TickThreadCheck.class)))
             .type(named("io.papermc.paper.command.brigadier.PaperCommands"))
             .transform((builder, type, classLoader, module, domain) -> builder
                 .method(named("getDispatcherInternal").and(takesArguments(0)))

@@ -9,6 +9,7 @@ import java.util.UUID;
 import net.bytebuddy.implementation.bind.annotation.RuntimeType;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -59,6 +60,33 @@ public final class ServerOverrides {
 
         public static Player getPlayerExact(String name) {
             return SandboxPlayers.byName(name);
+        }
+    }
+
+    public static final class OfflinePlayerLookup {
+
+        private OfflinePlayerLookup() {}
+
+        public static OfflinePlayer getOfflinePlayer(UUID uniqueId) {
+            Player online = SandboxPlayers.byId(uniqueId);
+            return online != null ? online : OfflinePlayers.byId(uniqueId);
+        }
+
+        public static OfflinePlayer getOfflinePlayer(String name) {
+            Player online = SandboxPlayers.byName(name);
+            return online != null ? online : OfflinePlayers.byName(name);
+        }
+    }
+
+    /**
+     * Paper decides "main thread" by the thread's class, a {@code TickThread} the harness's main thread is not.
+     */
+    public static final class TickThreadCheck {
+
+        private TickThreadCheck() {}
+
+        public static boolean isTickThread() {
+            return PrimaryThread.isPrimaryThread();
         }
     }
 
