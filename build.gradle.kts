@@ -15,6 +15,7 @@ val pluginJars by lazy {
 }
 val versions = (findProperty("versions") ?: property("harness.versions")).toString().split(',').map { it.trim() }
 val checkStage = (findProperty("stage") ?: "max").toString()
+val extraJvmArgs = findProperty("harness.jvmArgs")?.toString()?.split(' ')?.filter { it.isNotBlank() } ?: emptyList()
 val agentJar = project(":agent").tasks.named("shadowJar")
 
 /** The JDK each version is run on: the oldest that version's real servers run on, so a newer-JDK-only call fails here too. */
@@ -152,6 +153,7 @@ val versionTasks = versions.map { version ->
             val loader = if (compileLoader != null) files(loaderClasses) else files()
             classpath = files(agent) + loader + files(serverClasspath(version))
             jvmArgs("-javaagent:${agent.absolutePath}", "-Xmx2g")
+            jvmArgs(extraJvmArgs)
             args("--version", version, "--report", reportFile(version).absolutePath,
                 "--allowlist", file("allowlist.txt").absolutePath, "--stage", checkStage,
                 "--plugins", pluginJars.joinToString(File.pathSeparator) { it.absolutePath })
