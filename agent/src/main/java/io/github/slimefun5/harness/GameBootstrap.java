@@ -35,8 +35,10 @@ final class GameBootstrap {
         Class<?> loader = Reflect.firstClass(DATAPACK_LOADER);
         if (loader != null) {
             loader.getMethod("load", Object.class).invoke(null, console);
-            Object access = Reflect.findMethod(console.getClass(), "registryAccess").invoke(console);
-            setCraftRegistry(layout, access);
+            if (layout.era == ServerLayout.Era.MOJANG_MAPPED) {
+                Object access = Reflect.findMethod(console.getClass(), "registryAccess").invoke(console);
+                setCraftRegistry(layout, access);
+            }
         } else if (layout.era == ServerLayout.Era.MOJANG_MAPPED) {
             installBuiltInRegistries(layout);
         }
