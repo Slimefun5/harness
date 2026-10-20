@@ -42,7 +42,13 @@ public final class HarnessAgent {
                 .method(named("getConsoleSender").and(takesArguments(0)))
                 .intercept(MethodDelegation.to(ServerOverrides.ConsoleSender.class))
                 .method(named("getPluginsFolder").and(takesArguments(0)))
-                .intercept(MethodDelegation.to(ServerOverrides.PluginsFolder.class)))
+                .intercept(MethodDelegation.to(ServerOverrides.PluginsFolder.class))
+                .method(named("createWorld").and(takesArguments(1)))
+                .intercept(MethodDelegation.to(HarnessWorlds.Creation.class)))
+            .type(nameMatches("org\\.bukkit\\.craftbukkit(\\.v[^.]+)?\\.util\\.CraftMagicNumbers"))
+            .transform((builder, type, classLoader, module, domain) -> builder
+                .method(named("getMainLevelName").and(takesArguments(0)))
+                .intercept(MethodDelegation.to(ServerOverrides.MainLevelName.class)))
             .type(named("io.papermc.paper.util.TickThread").or(named("ca.spottedleaf.moonrise.common.util.TickThread")))
             .transform((builder, type, classLoader, module, domain) -> builder
                 .method(named("isTickThread").and(takesArguments(0)))

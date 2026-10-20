@@ -54,6 +54,7 @@ public final class HarnessMain {
             log.harnessFailure("the harness stopped", cause);
             failure = cause.toString();
         }
+        HarnessWorlds.reportGaps();
         log.importLog4jFile(new File("logs/latest.log"));
         writeReport(arguments.report, log.records(), Allowlist.read(arguments.allowlist), failure,
             (System.nanoTime() - start) / 1_000_000);

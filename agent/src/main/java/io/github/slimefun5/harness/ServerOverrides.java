@@ -99,6 +99,16 @@ public final class ServerOverrides {
         }
     }
 
+    /** Paper 1.20.5+ reads it from {@code server.properties} whenever a {@code WorldCreator} is constructed. */
+    public static final class MainLevelName {
+
+        private MainLevelName() {}
+
+        public static String getMainLevelName() {
+            return "world";
+        }
+    }
+
     /** Paper 1.17+ reads the folder from launch options a harness never has. */
     public static final class PluginsFolder {
 
