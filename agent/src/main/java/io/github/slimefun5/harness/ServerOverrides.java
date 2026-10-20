@@ -91,6 +91,18 @@ public final class ServerOverrides {
         }
     }
 
+    /** Spigot compares against the server's own thread, which only a running game starts; still catches async calls. */
+    public static final class AsyncCatch {
+
+        private AsyncCatch() {}
+
+        public static void catchOp(String reason) {
+            if (!PrimaryThread.isPrimaryThread()) {
+                throw new IllegalStateException("Asynchronous " + reason + "!");
+            }
+        }
+    }
+
     public static final class ConsoleSender {
 
         private ConsoleSender() {}

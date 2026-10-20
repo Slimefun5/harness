@@ -53,6 +53,10 @@ public final class HarnessAgent {
             .transform((builder, type, classLoader, module, domain) -> builder
                 .method(named("getMainLevelName").and(takesArguments(0)))
                 .intercept(MethodDelegation.to(ServerOverrides.MainLevelName.class)))
+            .type(named("org.spigotmc.AsyncCatcher"))
+            .transform((builder, type, classLoader, module, domain) -> builder
+                .method(named("catchOp").and(takesArguments(String.class)))
+                .intercept(MethodDelegation.to(ServerOverrides.AsyncCatch.class)))
             .type(named("io.papermc.paper.util.TickThread").or(named("ca.spottedleaf.moonrise.common.util.TickThread")))
             .transform((builder, type, classLoader, module, domain) -> builder
                 .method(named("isTickThread").and(takesArguments(0)))
