@@ -5,6 +5,7 @@ import static net.bytebuddy.matcher.ElementMatchers.isSubTypeOf;
 import static net.bytebuddy.matcher.ElementMatchers.nameMatches;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.returns;
+import static net.bytebuddy.matcher.ElementMatchers.takesArgument;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 import java.lang.instrument.Instrumentation;
@@ -12,6 +13,7 @@ import java.util.Collection;
 import java.util.UUID;
 
 import net.bytebuddy.agent.builder.AgentBuilder;
+import net.bytebuddy.asm.Advice;
 import net.bytebuddy.implementation.MethodDelegation;
 
 /**
@@ -44,7 +46,9 @@ public final class HarnessAgent {
                 .method(named("getPluginsFolder").and(takesArguments(0)))
                 .intercept(MethodDelegation.to(ServerOverrides.PluginsFolder.class))
                 .method(named("createWorld").and(takesArguments(1)))
-                .intercept(MethodDelegation.to(HarnessWorlds.Creation.class)))
+                .intercept(MethodDelegation.to(HarnessWorlds.Creation.class))
+                .visit(Advice.to(ServerOverrides.RecipeResend.class)
+                    .on(named("addRecipe").and(takesArguments(2)).and(takesArgument(1, boolean.class)))))
             .type(nameMatches("org\\.bukkit\\.craftbukkit(\\.v[^.]+)?\\.util\\.CraftMagicNumbers"))
             .transform((builder, type, classLoader, module, domain) -> builder
                 .method(named("getMainLevelName").and(takesArguments(0)))

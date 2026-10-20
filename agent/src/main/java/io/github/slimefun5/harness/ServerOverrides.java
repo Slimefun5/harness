@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import net.bytebuddy.asm.Advice;
 import net.bytebuddy.implementation.bind.annotation.RuntimeType;
 
 import org.bukkit.Bukkit;
@@ -96,6 +97,34 @@ public final class ServerOverrides {
 
         public static ConsoleCommandSender getConsoleSender() {
             return HarnessConsole.get();
+        }
+    }
+
+    /**
+     * Keeps a recipe that was registered when only the resend to online players failed: from 1.21.2 that resend
+     * always goes through a player list only a running game has, after the recipe is already in the manager.
+     */
+    public static final class RecipeResend {
+
+        private RecipeResend() {}
+
+        @Advice.OnMethodExit(onThrowable = NullPointerException.class)
+        static void exit(@Advice.This Object server, @Advice.Thrown(readOnly = false) Throwable thrown,
+                         @Advice.Return(readOnly = false) boolean added) {
+            if (thrown != null && hasNoPlayerList(server)) {
+                thrown = null;
+                added = true;
+            }
+        }
+
+        public static boolean hasNoPlayerList(Object server) {
+            try {
+                java.lang.reflect.Field playerList = server.getClass().getDeclaredField("playerList");
+                playerList.setAccessible(true);
+                return playerList.get(server) == null;
+            } catch (ReflectiveOperationException absent) {
+                return false;
+            }
         }
     }
 
